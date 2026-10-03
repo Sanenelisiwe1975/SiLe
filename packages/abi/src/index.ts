@@ -1,7 +1,7 @@
 import type { Address } from 'viem'
-import { deployments } from './generated.js'
+import { deployments } from './generated'
 
-export { planRegistryAbi, subscriptionLedgerAbi, deployments } from './generated.js'
+export { planRegistryAbi, subscriptionLedgerAbi, deployments } from './generated'
 
 export type Deployment = { planRegistry: Address; subscriptionLedger: Address; operator: Address; startBlock: number }
 

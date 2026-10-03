@@ -9,9 +9,10 @@
  */
 import { type Address, type Hex, encodeFunctionData, parseEventLogs } from 'viem'
 import { generatePrivateKey } from 'viem/accounts'
-import { Abis, Account, Scopes } from 'viem/tempo'
+import { Abis, Account } from 'viem/tempo'
 import { eq } from 'drizzle-orm'
 import { planRegistryAbi, subscriptionLedgerAbi } from '@sile/abi'
+import { buildSubscribeCalls } from '@sile/sdk'
 import { type SubscriptionIntentResponse, txUrl } from '@sile/shared'
 import { createApi } from '../src/api/index.js'
 import { createChain } from '../src/chain.js'
@@ -98,27 +99,8 @@ async function checkout(subscriber: ReturnType<typeof Account.fromSecp256k1>) {
     body: JSON.stringify({ planId: planId.toString(), subscriber: subscriber.address }),
   })
   const intent = (await res.json()) as SubscriptionIntentResponse
-  const keyAuthorization = await client.accessKey.signAuthorization({
-    account: subscriber,
-    accessKey: { publicKey: intent.publicKey as Hex, type: 'p256' },
-    expiry: intent.expiry,
-    limits: [{ token: intent.token as Address, limit: BigInt(intent.limit), period: intent.period }],
-    scopes: [Scopes.tip20(intent.token as Address).transferWithMemo({ recipients: [intent.recipient as Address] })],
-  } as any)
-  const rc = await client.sendTransactionSync({
-    account: subscriber,
-    keyAuthorization,
-    calls: [
-      {
-        to: intent.ledger as Address,
-        data: encodeFunctionData({
-          abi: subscriptionLedgerAbi,
-          functionName: 'subscribe',
-          args: [planId, intent.keyId as Address],
-        }),
-      },
-    ],
-  })
+  // ONE root signature: keychain.authorizeKey + ledger.subscribe in a single Tempo tx (same calls the web sends).
+  const rc = await client.sendTransactionSync({ account: subscriber, calls: buildSubscribeCalls(intent, planId) })
   const subId = (parseEventLogs({ abi: subscriptionLedgerAbi, logs: rc.logs, eventName: 'Subscribed' })[0]!.args as any)
     .subId.toString() as string
   console.log(`subscribed #${subId} in one tx ${txUrl(rc.transactionHash)}`)

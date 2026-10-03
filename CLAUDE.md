@@ -74,6 +74,7 @@ Priority: a working end-to-end demo over completeness.
 - **One signature checkout works:** a root-signed tx with `keyAuthorization` + `calls: [contract call]` (fee sponsored) succeeds.
   The called contract sees `msg.sender = subscriber` and can read the new key from the keychain precompile in the same tx
   (`getKey` and `getRemainingLimitWithPeriod` return the fresh key). `getTransactionKey()` = `0x0` (root).
+- **ONE root signature (best for passkeys):** `calls: [keychain.authorizeKey(keyId, 1 /*P256*/, KeyRestrictions), ledger.subscribe(planId, keyId)]` signed once by the root works (scripts/spike-batch.ts). `keyAuthorization` + call needs TWO root signatures (auth digest + tx). Canonical selector `0x980a6025` = viem `Abis.accountKeychain` 3-arg overload.
 - **Sponsored authorise works for a zero-balance account** (fee payer covers everything).
 - Right after authorise: `remaining = limit`, `periodEnd ≈ now + period`. Rollover observed after `periodEnd`.
 - Memo: `bytes32`. Charge tx events: `AccessKeySpend, Transfer, TransferWithMemo, Transfer` (the last one is the fee).
@@ -97,7 +98,9 @@ Priority: a working end-to-end demo over completeness.
 - Deployed addresses: `contracts/deployments/<chainId>.json`
 - Charger: `pnpm --filter @sile/charger dev` (reads root .env) · E2E on Moderato: `pnpm --filter @sile/charger e2e` (~3 min; full demo path + dunning)
 - ABIs after contract changes: `cd contracts && forge build && cd .. && pnpm gen:abi`
-- Web: `pnpm --filter web dev`
+- Web: `pnpm --filter web dev` (NEXT_PUBLIC_CHARGER_URL, default http://localhost:8787)
+- Browser checkout test (charger + web running): `pnpm tsx scripts/browser-checkout.ts <planId> [shotDir]` (headless Chromium + virtual WebAuthn authenticator)
+- Workspace packages ship TS source: use extensionless relative imports (Turbopack does not map `.js`→`.ts`).
 
 ## Env vars
 `TEMPO_RPC_URL`, `CHAIN_ID`, `DEPLOYER_PRIVATE_KEY`, `OPERATOR_PRIVATE_KEY` (charger: `markPaid` + fee payer),
