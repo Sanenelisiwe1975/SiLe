@@ -1,0 +1,9 @@
+{
+  "chainId": 42431,
+  "network": "moderato",
+  "deployedAt": "2026-10-03",
+  "PlanRegistry": "0x55db89fE84e2Bd0ed895702a4382BF42EE6882C5",
+  "SubscriptionLedger": "0x80106042b1c49C4e993921D16b9d11cB3056e4D5",
+  "operator": "0x35A0dfe544FCBD36D59257d735588A0BBC1605d8",
+  "admin": "0xC3De397372B9dD7D3cD1416d24CE639C85F1d92c"
+}

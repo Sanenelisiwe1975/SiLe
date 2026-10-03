@@ -92,8 +92,9 @@ Priority: a working end-to-end demo over completeness.
 - Prerequisites: Node 20+, `corepack enable` (pnpm), Foundry via `foundryup` (upstream Foundry supports Tempo; `tempo-foundry` is deprecated).
 - `pnpm i` · `pnpm build` · `pnpm typecheck` · `pnpm test` (Turborepo)
 - Contracts: `cd contracts && forge build && forge test`. `foundry.toml` sets `tempo = true`.
-- Deploy: `forge script script/Deploy.s.sol --rpc-url moderato --broadcast --tempo.fee-token 0x20c0000000000000000000000000000000000001`
-- Spike: `pnpm tsx scripts/spike.ts`
+- Deploy (from contracts/, with .env loaded): `forge script script/Deploy.s.sol --rpc-url moderato --broadcast --tempo.fee-token 0x20c0000000000000000000000000000000000001`
+- Spike: `pnpm spike` · Contract smoke test on Moderato: `pnpm tsx --env-file=.env scripts/smoke-ledger.ts <registry> <ledger>`
+- Deployed addresses: `contracts/deployments/<chainId>.json`
 - Charger: `pnpm --filter charger dev` · Web: `pnpm --filter web dev`
 
 ## Env vars
