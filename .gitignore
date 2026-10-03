@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+dist/
+.next/
+.turbo/
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+scripts/spike/out/
+scripts/spike/cache/
+*.sqlite
+.spike-state.json

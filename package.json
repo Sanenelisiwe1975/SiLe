@@ -1,0 +1,16 @@
+{
+  "name": "sile",
+  "private": true,
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@9.15.9",
+  "type": "module",
+  "scripts": {
+    "spike": "tsx scripts/spike.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "viem": "^2.57.2"
+  }
+}
