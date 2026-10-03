@@ -19,13 +19,14 @@ for (const name of CONTRACTS) {
   out += `export const ${camel(name)}Abi = ${JSON.stringify(artifact.abi, null, 2)} as const\n\n`
 }
 
-const deployments: Record<number, Record<string, string>> = {}
+const deployments: Record<number, Record<string, unknown>> = {}
 for (const f of readdirSync(join(contracts, 'deployments')).filter((f) => f.endsWith('.json'))) {
   const d = JSON.parse(readFileSync(join(contracts, 'deployments', f), 'utf8'))
   deployments[d.chainId] = {
     planRegistry: getAddress(d.PlanRegistry),
     subscriptionLedger: getAddress(d.SubscriptionLedger),
     operator: getAddress(d.operator),
+    startBlock: d.startBlock,
   }
 }
 out += `export const deployments = ${JSON.stringify(deployments, null, 2)} as const\n`

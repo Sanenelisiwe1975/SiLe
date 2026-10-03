@@ -95,7 +95,9 @@ Priority: a working end-to-end demo over completeness.
 - Deploy (from contracts/, with .env loaded): `forge script script/Deploy.s.sol --rpc-url moderato --broadcast --tempo.fee-token 0x20c0000000000000000000000000000000000001`
 - Spike: `pnpm spike` · Contract smoke test on Moderato: `pnpm tsx --env-file=.env scripts/smoke-ledger.ts <registry> <ledger>`
 - Deployed addresses: `contracts/deployments/<chainId>.json`
-- Charger: `pnpm --filter charger dev` · Web: `pnpm --filter web dev`
+- Charger: `pnpm --filter @sile/charger dev` (reads root .env) · E2E on Moderato: `pnpm --filter @sile/charger e2e` (~3 min; full demo path + dunning)
+- ABIs after contract changes: `cd contracts && forge build && cd .. && pnpm gen:abi`
+- Web: `pnpm --filter web dev`
 
 ## Env vars
 `TEMPO_RPC_URL`, `CHAIN_ID`, `DEPLOYER_PRIVATE_KEY`, `OPERATOR_PRIVATE_KEY` (charger: `markPaid` + fee payer),
@@ -103,6 +105,9 @@ Priority: a working end-to-end demo over completeness.
 `DUNNING_SCHEDULE_SECONDS` (default `3600,21600,86400`; demo `10,30,60`), `DATABASE_URL` (SQLite file).
 
 ## Conventions
+- Charger DB: SQLite via `@libsql/client` + Drizzle (better-sqlite3 fails to build on this Windows box). Schema avoids SQLite-only types.
+- Store every address checksummed (`getAddress`): viem returns `accessKeyAddress` lowercase.
+- Demo period: the merchant creates the plan with `DEMO_PERIOD_SECONDS` as its on-chain period, so chain terms always equal billing reality.
 - Package scope `@sile/*`. Amounts are `bigint` in base units end to end; format only in the UI.
 - Zod at every API boundary. Invoice memo codec lives in `@sile/shared`, mirrors `contracts/src/libs/Invoice.sol`, and both are tested against shared vectors.
 - Keep contracts small: storage writes cost 250k gas on Tempo. Prefer events to per-invoice storage.

@@ -797,6 +797,7 @@ export const deployments = {
   "42431": {
     "planRegistry": "0x55db89fE84e2Bd0ed895702a4382BF42EE6882C5",
     "subscriptionLedger": "0x80106042b1c49C4e993921D16b9d11cB3056e4D5",
-    "operator": "0x35A0dfe544FCBD36D59257d735588A0BBC1605d8"
+    "operator": "0x35A0dfe544FCBD36D59257d735588A0BBC1605d8",
+    "startBlock": 37921745
   }
 } as const

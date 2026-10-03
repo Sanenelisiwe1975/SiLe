@@ -36,7 +36,7 @@ export const Subscription = z.object({
 })
 export type Subscription = z.infer<typeof Subscription>
 
-export const InvoiceStatus = z.enum(['pending', 'paid', 'failed'])
+export const InvoiceStatus = z.enum(['pending', 'charged', 'paid', 'failed'])
 export const Invoice = z.object({
   invoiceId: zHex32, // == memo
   subId: z.string(),
