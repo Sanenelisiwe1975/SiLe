@@ -91,7 +91,7 @@ Priority: a working end-to-end demo over completeness.
 
 ## Commands (filled in as the repo is scaffolded)
 - Prerequisites: Node 20+, `corepack enable` (pnpm), Foundry via `foundryup` (upstream Foundry supports Tempo; `tempo-foundry` is deprecated).
-- `pnpm i` · `pnpm build` · `pnpm typecheck` · `pnpm test` (Turborepo)
+- `pnpm i` · `pnpm build` · `pnpm typecheck` · `pnpm test` · `pnpm typecheck:scripts` (Turborepo, concurrency 2: parallel tsgo processes crash on this low-memory/near-full-disk machine)
 - Contracts: `cd contracts && forge build && forge test`. `foundry.toml` sets `tempo = true`.
 - Deploy (from contracts/, with .env loaded): `forge script script/Deploy.s.sol --rpc-url moderato --broadcast --tempo.fee-token 0x20c0000000000000000000000000000000000001`
 - Spike: `pnpm spike` · Contract smoke test on Moderato: `pnpm tsx --env-file=.env scripts/smoke-ledger.ts <registry> <ledger>`
@@ -100,7 +100,7 @@ Priority: a working end-to-end demo over completeness.
 - ABIs after contract changes: `cd contracts && forge build && cd .. && pnpm gen:abi`
 - Web: `pnpm --filter web dev` (NEXT_PUBLIC_CHARGER_URL, default http://localhost:8787)
 - Browser checkout test (charger + web running): `pnpm tsx scripts/browser-checkout.ts <planId> [shotDir]` (headless Chromium + virtual WebAuthn authenticator)
-- Browser merchant test (charger + web running): `pnpm tsx scripts/browser-merchant.ts [shotDir]` (publish plan → passkey checkout → overcharge rejected → CSV)
+- Browser demo test (charger + web running): `pnpm tsx scripts/browser-demo.ts [shotDir]` (the full demo script: publish → passkey checkout → overcharge rejected → 2nd charge → revoke → cancel)
 - Workspace packages ship TS source: use extensionless relative imports (Turbopack does not map `.js`→`.ts`).
 
 ## Env vars

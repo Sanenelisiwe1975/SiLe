@@ -6,11 +6,12 @@
   "type": "module",
   "scripts": {
     "build": "turbo run build",
-    "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
+    "typecheck": "turbo run typecheck --concurrency=2",
+    "test": "turbo run test --concurrency=2",
     "test:contracts": "cd contracts && forge test",
     "spike": "tsx scripts/spike.ts",
-    "gen:abi": "pnpm --filter @sile/abi gen"
+    "gen:abi": "pnpm --filter @sile/abi gen",
+    "typecheck:scripts": "tsc -p tsconfig.scripts.json"
   },
   "devDependencies": {
     "@sile/abi": "workspace:^",

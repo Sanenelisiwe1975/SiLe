@@ -1,8 +1,9 @@
 /**
- * Merchant dashboard flow in headless Chromium (charger :8787 + web :3000 running):
- * merchant (demo key) publishes a plan → subscriber (passkey, separate browser context) checks out →
- * dashboard shows the subscriber + charge → "Try overcharge" is rejected on-chain → CSV has tx + memo.
- * Run: pnpm tsx scripts/browser-merchant.ts [screenshotDir]
+ * The full demo script in headless Chromium (charger :8787 + web :3000 running, DEMO_PERIOD_SECONDS set):
+ * merchant (demo key) publishes a plan → subscriber (passkey, separate context) checks out in one prompt →
+ * first charge → "Try overcharge" rejected on-chain → CSV has tx + memo → second charge after the period →
+ * subscriber revokes the key → next charge rejected by Tempo → dunning cancels → both views show it.
+ * Run: pnpm tsx scripts/browser-demo.ts [screenshotDir]
  */
 import { type BrowserContext, chromium } from 'playwright'
 
@@ -83,7 +84,30 @@ try {
     const [header, row] = csv.trim().split('\n')
     if (!header!.startsWith('tx_hash,memo') || !/^0x[0-9a-f]{64},0x53694c65/.test(row ?? '')) throw new Error(`bad csv: ${csv.slice(0, 200)}`)
   })
-  console.log('BROWSER MERCHANT OK')
+  await step('subscriber sees the subscription and charge #2 lands after the period', async () => {
+    await subscriber.goto(`${WEB}/subscriptions`)
+    const card = subscriber.locator('section', { hasText: planName })
+    await card.waitFor({ timeout: 60_000 })
+    await card.locator('dd').first().filter({ hasText: /^[2-9]/ }).waitFor({ timeout: 150_000 })
+  })
+
+  await step('subscriber revokes the billing key (one passkey prompt)', async () => {
+    const card = subscriber.locator('section', { hasText: planName })
+    await card.getByRole('button', { name: 'Revoke billing key' }).click()
+    await card.getByText('Key revoked on-chain').waitFor({ timeout: 60_000 })
+    await card.getByText('revoked / expired').waitFor({ timeout: 30_000 })
+  })
+
+  await step('next charge is rejected by Tempo and dunning cancels', async () => {
+    const card = subscriber.locator('section', { hasText: planName })
+    await card.getByText('Canceled: key revoked or expired').waitFor({ timeout: 150_000 })
+    await subscriber.screenshot({ path: `${shots}/subscriptions.png`, fullPage: true })
+    const row = merchant.locator('tr', { hasText: planName })
+    await row.getByText('canceled').waitFor({ timeout: 30_000 })
+    await merchant.getByText('Billing key revoked').waitFor({ timeout: 30_000 })
+    await merchant.screenshot({ path: `${shots}/merchant-after.png`, fullPage: true })
+  })
+  console.log('BROWSER DEMO OK')
 } catch (e) {
   await merchant.screenshot({ path: `${shots}/merchant-failure.png`, fullPage: true })
   await subscriber.screenshot({ path: `${shots}/subscriber-failure.png`, fullPage: true })

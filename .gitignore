@@ -12,3 +12,6 @@ scripts/spike/out/
 scripts/spike/cache/
 *.sqlite
 .spike-state.json
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
