@@ -69,21 +69,26 @@ Classify each failure:
 | RPC / transient | short exponential backoff; does not count as a dunning attempt |
 
 ## Indexer
-Polls `getLogs` from the last processed block: `PlanCreated`, `Subscribed`, `Paid`, `StatusChanged`, keychain
-`KeyRevoked` (filter on known keyIds, so revokes are seen before the next charge), and TIP-20 `TransferWithMemo`
-filtered on memos with the `SiLe` prefix (memo is indexed). The DB is a cache; the chain is the source of truth.
+Polls `getLogs` from the last processed block (chunks of 2,000) for `PlanCreated`, `PlanDeactivated`, `Subscribed`,
+`Paid` and `StatusChanged`. A subscription is *managed* only if its key is one the charger minted for that subscriber and plan.
+Revokes are not indexed: the next charge attempt sees them (`KeyAlreadyRevoked`) and dunning cancels.
+TIP-20 `TransferWithMemo` is queried only for crash recovery, by indexed memo, when a period's budget is spent
+but no invoice was recorded. The DB is a cache; the chain is the source of truth.
 
-## Checkout (one signature, spike-verified)
+## Checkout (one signature, verified on Moderato)
 1. Web asks the charger `POST /subscriptions/intent {planId, subscriber}`. The charger creates a P256 key, stores it encrypted,
-   and returns `{ keyId, publicKey }`.
-2. The subscriber signs **one** Tempo tx: attach `keyAuthorization` (limit = amount, period, scope =
-   `Scopes.tip20(token)` transferWithMemo → merchant, expiry 12 months) and call `ledger.subscribe(planId, keyId)`.
-   The tx is fee-sponsored by the operator (checked with a zero-balance account). Key ID = `accessKeyAddress`.
+   and returns the key id, public key and the exact terms.
+2. The subscriber's root key (a passkey) signs **one** Tempo tx: `calls = [keychain.authorizeKey(keyId, P256, {limit = amount,
+   period, scope = token.transferWithMemo → merchant, expiry 12 months}), ledger.subscribe(planId, keyId)]`
+   (`@sile/sdk` `buildSubscribeCalls`). Using `keyAuthorization` instead would need two root signatures (two passkey prompts).
+   The subscriber pays this one tx's fee. Charges are always sponsored. Key ID = `accessKeyAddress`, stored checksummed.
 3. The indexer sees `Subscribed`, the scheduler charges period 0 immediately, and the UI shows the first receipt.
 
 ## API and webhooks
-REST: `GET /plans`, `GET /subscriptions?merchant=|subscriber=`, `GET /invoices.csv` (txHash, memo, amount, period),
-`GET /metrics` (MRR = Σ active plan amount normalised to 30 days), `POST /subscriptions/intent`, `POST /demo/overcharge`.
+REST: `GET /health`, `GET /config`, `GET /plans[?merchant=]`, `GET /plans/:id`, `POST /subscriptions/intent`,
+`GET /subscriptions?merchant=|subscriber=`, `GET /subscriptions/:id` (with invoices), `GET /merchants/:addr/metrics`
+(MRR = Σ active amount normalised to 30 days), `GET /merchants/:addr/invoices.csv` (tx hash + memo).
+Demo mode only: `POST /demo/overcharge/:subId`, `POST /demo/tick`.
 Webhooks: `subscription.created|charged|past_due|canceled`, body signed `X-SiLe-Signature: t=<ts>,v1=HMAC_SHA256(secret, t.body)`.
 
 ## Demo script (protocol proofs)
