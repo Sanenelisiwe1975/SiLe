@@ -100,6 +100,7 @@ Priority: a working end-to-end demo over completeness.
 - ABIs after contract changes: `cd contracts && forge build && cd .. && pnpm gen:abi`
 - Web: `pnpm --filter web dev` (NEXT_PUBLIC_CHARGER_URL, default http://localhost:8787)
 - Browser checkout test (charger + web running): `pnpm tsx scripts/browser-checkout.ts <planId> [shotDir]` (headless Chromium + virtual WebAuthn authenticator)
+- Browser merchant test (charger + web running): `pnpm tsx scripts/browser-merchant.ts [shotDir]` (publish plan → passkey checkout → overcharge rejected → CSV)
 - Workspace packages ship TS source: use extensionless relative imports (Turbopack does not map `.js`→`.ts`).
 
 ## Env vars

@@ -13,6 +13,7 @@ import { client } from '@/lib/chain'
 import { type ChargerConfig, type SubscriptionDetail, charger } from '@/lib/charger'
 import { formatAmount, formatPeriod, short } from '@/lib/format'
 import { useBalance, usePoll, useToken } from '@/lib/hooks'
+import { decodePlanMeta } from '@/lib/planMeta'
 import { useSession } from '@/lib/session'
 
 type OnchainPlan = { merchant: Address; token: Address; amount: bigint; period: bigint; active: boolean }
@@ -37,6 +38,7 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string>()
   const [subTx, setSubTx] = useState<Hex>()
   const [subId, setSubId] = useState<string>()
+  const [planName, setPlanName] = useState<string>()
 
   const token = useToken(plan?.token)
   const balance = useBalance(plan?.token, session?.account.address)
@@ -52,6 +54,8 @@ export default function CheckoutPage() {
         args: [BigInt(planId)],
       })) as OnchainPlan
       setPlan(p)
+      // Name comes from metadata (charger index); terms above are always read from chain.
+      charger.plan(planId).then((x) => setPlanName(decodePlanMeta(x.metadataURI, planId).name)).catch(() => {})
     })().catch((e) => setLoadError(e instanceof Error ? e.message.split('\n')[0] : String(e)))
   }, [planId])
 
@@ -98,7 +102,9 @@ export default function CheckoutPage() {
   return (
     <div className="grid gap-6 md:grid-cols-[1fr_1.1fr]">
       <Card>
-        <p className="text-sm text-muted">Plan #{planId}</p>
+        <p className="text-sm text-muted">
+          {planName && planName !== `Plan #${planId}` ? <><strong className="text-ink">{planName}</strong> · </> : null}Plan #{planId}
+        </p>
         <h1 className="mt-1 text-3xl font-semibold">
           {price}
           <span className="text-base font-normal text-muted"> / {every}</span>

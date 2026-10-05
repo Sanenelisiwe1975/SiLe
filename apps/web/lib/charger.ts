@@ -37,6 +37,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 export const charger = {
   config: () => api<ChargerConfig>('/config'),
   plans: (merchant?: string) => api<Plan[]>(`/plans${merchant ? `?merchant=${merchant}` : ''}`),
+  plan: (planId: string) => api<Plan>(`/plans/${planId}`),
   intent: (planId: string, subscriber: string) =>
     api<SubscriptionIntentResponse>('/subscriptions/intent', {
       method: 'POST',
