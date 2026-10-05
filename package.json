@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@sile/abi": "workspace:^",
+    "@sile/sdk": "workspace:^",
     "@sile/shared": "workspace:^",
     "@types/node": "^26.6.4",
     "playwright": "^1.63.0",

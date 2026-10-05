@@ -11,6 +11,9 @@ importers:
       '@sile/abi':
         specifier: workspace:^
         version: link:packages/abi
+      '@sile/sdk':
+        specifier: workspace:^
+        version: link:packages/sdk
       '@sile/shared':
         specifier: workspace:^
         version: link:packages/shared
