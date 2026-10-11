@@ -38,8 +38,7 @@ Subscriber (passkey)                              Merchant
 | Which plan / subscription / invoice a payment belongs to | SiLe ledger + 32-byte memo on every transfer |
 | *When* to charge, retries, past-due, cancel | SiLe charger (it can only ask; the chain decides) |
 
-Design notes and every verified protocol fact (with sources) are in [`docs/architecture.md`](docs/architecture.md)
-and [`CLAUDE.md`](CLAUDE.md).
+Design notes and every verified protocol fact (with sources) are in [`docs/architecture.md`](docs/architecture.md).
 
 ### Things we learned on Moderato that shaped the design
 - Spending limits only cover direct `transfer`/`transferWithMemo`/`approve` calls where `msg.sender == tx.origin`.
