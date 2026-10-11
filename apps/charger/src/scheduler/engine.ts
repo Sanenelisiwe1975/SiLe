@@ -41,6 +41,7 @@ export class ChargeEngine {
     if (this.#running) return 0
     this.#running = true
     try {
+      await this.reconcileStaleInvoices()
       const due = await this.db.query.subscriptions.findMany({
         where: and(
           eq(schema.subscriptions.managed, true),
@@ -61,6 +62,55 @@ export class ChargeEngine {
     } finally {
       this.#running = false
     }
+  }
+
+  async reconcileStaleInvoices(): Promise<number> {
+    const stale = await this.db.query.invoices.findMany({
+      where: eq(schema.invoices.status, 'pending'),
+    })
+    const charged = await this.db.query.invoices.findMany({
+      where: eq(schema.invoices.status, 'charged'),
+    })
+    const rows = [...stale, ...charged]
+    let recovered = 0
+
+    for (const invoice of rows) {
+      const sub = await this.db.query.subscriptions.findFirst({ where: eq(schema.subscriptions.subId, invoice.subId) })
+      if (!sub) continue
+      const txHash = await this.findTransferByMemo(sub, invoice.invoiceId as Hex)
+      if (!txHash) continue
+      try {
+        await this.recordPaid(sub, invoice, txHash)
+        recovered += 1
+      } catch (e) {
+        log.warn('invoice reconcile failed', { subId: sub.subId, invoiceId: invoice.invoiceId, error: errorText(e).slice(0, 200) })
+      }
+    }
+
+    return recovered
+  }
+
+  async reconcileManagedSubscriptions(): Promise<number> {
+    const managed = await this.db.query.subscriptions.findMany({
+      where: and(eq(schema.subscriptions.managed, true), ne(schema.subscriptions.status, 'canceled')),
+    })
+
+    let repaired = 0
+    for (const sub of managed) {
+      if (sub.nextChargeAt !== null) continue
+      try {
+        const { periodEnd } = await this.limit(sub)
+        const nextChargeAt = periodEnd && periodEnd > 0n ? Number(periodEnd) : nowSec() + sub.period
+        await this.setSub(sub.subId, { nextChargeAt })
+        repaired += 1
+      } catch (e) {
+        log.warn('managed subscription repair failed', {
+          subId: sub.subId,
+          error: errorText(e).slice(0, 200),
+        })
+      }
+    }
+    return repaired
   }
 
   private memoFor(sub: Sub, seq = sub.invoicesPaid): Hex {
@@ -150,6 +200,15 @@ export class ChargeEngine {
     return row!
   }
 
+  private async nextChargeAtAfterPeriod(sub: Sub, fallback: number): Promise<number> {
+    try {
+      const { periodEnd } = await this.limit(sub)
+      return periodEnd && periodEnd > 0n ? Number(periodEnd) : fallback
+    } catch {
+      return fallback
+    }
+  }
+
   /** Transfer landed → record it on the ledger, schedule the next period from the chain's periodEnd. */
   private async recordPaid(sub: Sub, invoice: Inv, txHash: Hex) {
     try {
@@ -166,7 +225,6 @@ export class ChargeEngine {
         return this.setSub(sub.subId, { nextChargeAt: nowSec() + 15 })
       }
     }
-    const { periodEnd } = await this.limit(sub)
     const paidAt = nowSec()
     const [inv] = await this.db
       .update(schema.invoices)
@@ -176,7 +234,7 @@ export class ChargeEngine {
     const updated = await this.setSub(sub.subId, {
       invoicesPaid: invoice.seq + 1,
       status: 'active',
-      nextChargeAt: periodEnd && periodEnd > 0n ? Number(periodEnd) : paidAt + sub.period,
+      nextChargeAt: await this.nextChargeAtAfterPeriod(sub, paidAt + sub.period),
     })
     await this.webhooks.emit('subscription.charged', subscriptionDto(updated), invoiceDto(inv!))
   }
@@ -220,8 +278,9 @@ export class ChargeEngine {
         return
       }
       case 'wait_period': {
-        const { periodEnd } = await this.limit(sub)
-        await this.setSub(sub.subId, { nextChargeAt: periodEnd && periodEnd > now ? Number(periodEnd) : now + sub.period })
+        await this.setSub(sub.subId, {
+          nextChargeAt: await this.nextChargeAtAfterPeriod(sub, now + sub.period),
+        })
         return
       }
       case 'halt':

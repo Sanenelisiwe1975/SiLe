@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { describe, expect, it, vi } from 'vitest'
 import { getAddress } from 'viem'
 import { Account } from 'viem/tempo'
@@ -56,6 +57,10 @@ describe('keystore', () => {
     await expect(ks.open(parts.join('.'))).rejects.toThrow()
     await expect(new EnvSecretKeyStore('t'.repeat(40)).open(sealed)).rejects.toThrow()
   })
+  it('rejects insecure secrets and placeholder defaults', () => {
+    expect(() => new EnvSecretKeyStore('changeme12345678901234567890')).toThrow(/placeholder|insecure/i)
+    expect(() => new EnvSecretKeyStore('short')).toThrow(/at least 32/i)
+  })
 })
 
 describe('config', () => {
@@ -64,6 +69,15 @@ describe('config', () => {
     expect(c.DUNNING_SCHEDULE_SECONDS).toEqual(SCHEDULE)
     expect(c.demo).toBe(true)
     expect(loadConfig({ ...env, DEMO_PERIOD_SECONDS: undefined } as any).demo).toBe(false)
+  })
+  it('rejects placeholder key store secrets', () => {
+    expect(() => loadConfig({ ...env, KEYSTORE_SECRET: 'changeme12345678901234567890' } as any)).toThrow(/placeholder|insecure/i)
+  })
+
+  it('requires https for remote webhook URLs while allowing localhost', () => {
+    expect(() => loadConfig({ ...env, WEBHOOK_URL: 'http://example.com/hook' } as any)).toThrow(/https/i)
+    expect(() => loadConfig({ ...env, WEBHOOK_URL: 'http://localhost:3000/hook' } as any)).not.toThrow()
+    expect(() => loadConfig({ ...env, WEBHOOK_URL: 'https://example.com/hook' } as any)).not.toThrow()
   })
 })
 
@@ -108,6 +122,171 @@ describe('API: subscription intent', () => {
 
     const bad = await app.request('/subscriptions/intent', { method: 'POST', body: '{"planId":1}' })
     expect(bad.status).toBe(400)
+  })
+})
+
+describe('charge engine recovery', () => {
+  it('falls back to the local period schedule when key lookup is unavailable during reconciliation', async () => {
+    const db = await openDb(':memory:')
+    const config = loadConfig(env as any)
+    const chain = {
+      chainId: 42431,
+      operator: Account.fromSecp256k1(config.OPERATOR_PRIVATE_KEY as `0x${string}`),
+      deployment: {
+        planRegistry: '0x0000000000000000000000000000000000000001',
+        subscriptionLedger: '0x0000000000000000000000000000000000000002',
+        operator: '0x0000000000000000000000000000000000000003',
+        startBlock: 0,
+      },
+      client: {
+        accessKey: {
+          getRemainingLimit: vi.fn(async () => {
+            throw new Error('key not found')
+          }),
+        },
+      },
+    } as unknown as Chain
+    const engine = new (await import('../src/scheduler/engine.js')).ChargeEngine(
+      db,
+      chain,
+      new EnvSecretKeyStore(config.KEYSTORE_SECRET),
+      new Webhooks(db, config.WEBHOOK_SECRET, 'https://example.test/hook'),
+      config,
+    )
+
+    const sub = {
+      subId: '42',
+      planId: '7',
+      subscriber: '0x1111111111111111111111111111111111111111',
+      merchant: '0x00000000000000000000000000000000000000Aa',
+      accessKey: '0x2222222222222222222222222222222222222222',
+      token: '0x20C0000000000000000000000000000000000001',
+      amount: '100',
+      period: 60,
+      status: 'active' as const,
+      invoicesPaid: 0,
+      nextChargeAt: 0,
+      managed: true,
+      haltReason: null,
+      createdBlock: 0,
+      createdAt: 0,
+    }
+    const fallback = 1_700_000_000 + 60
+    await expect((engine as any).nextChargeAtAfterPeriod(sub, fallback)).resolves.toBe(fallback)
+  })
+
+  it('reconciles stale pending invoices back to paid when the transfer memo is on-chain', async () => {
+    const db = await openDb(':memory:')
+    const config = loadConfig(env as any)
+    const txHash = '0x' + '11'.repeat(32)
+    const sub = {
+      subId: '99',
+      planId: '7',
+      subscriber: '0x1111111111111111111111111111111111111111',
+      merchant: '0x00000000000000000000000000000000000000Aa',
+      accessKey: '0x2222222222222222222222222222222222222222',
+      token: '0x20C0000000000000000000000000000000000001',
+      amount: '100',
+      period: 60,
+      status: 'active' as const,
+      invoicesPaid: 0,
+      nextChargeAt: 0,
+      managed: true,
+      haltReason: null,
+      createdBlock: 0,
+      createdAt: 0,
+    }
+    await db.insert(schema.subscriptions).values(sub)
+    const invoiceId = '0x' + '22'.repeat(32)
+    await db.insert(schema.invoices).values({
+      invoiceId,
+      subId: sub.subId,
+      seq: 0,
+      amount: sub.amount,
+      token: sub.token,
+      status: 'pending',
+      attempts: 0,
+      createdAt: 0,
+    })
+
+    const chain = {
+      chainId: 42431,
+      operator: Account.fromSecp256k1(config.OPERATOR_PRIVATE_KEY as `0x${string}`),
+      deployment: {
+        planRegistry: '0x0000000000000000000000000000000000000001',
+        subscriptionLedger: '0x0000000000000000000000000000000000000002',
+        operator: '0x0000000000000000000000000000000000000003',
+        startBlock: 0,
+      },
+      client: {
+        getBlockNumber: vi.fn(async () => 100n),
+        getLogs: vi.fn(async () => [{ transactionHash: txHash, args: { from: sub.subscriber, memo: invoiceId } }]),
+        accessKey: {
+          getRemainingLimit: vi.fn(async () => ({ remaining: 100n, periodEnd: 200n })),
+        },
+        readContract: vi.fn(async () => ({ invoicesPaid: 0n })),
+        sendTransactionSync: vi.fn(async () => ({ transactionHash: txHash })),
+      },
+    } as unknown as Chain
+    const engine = new (await import('../src/scheduler/engine.js')).ChargeEngine(
+      db,
+      chain,
+      new EnvSecretKeyStore(config.KEYSTORE_SECRET),
+      new Webhooks(db, config.WEBHOOK_SECRET, 'https://example.test/hook'),
+      config,
+    )
+
+    await expect(engine.reconcileStaleInvoices()).resolves.toBe(1)
+    const row = await db.query.invoices.findFirst({ where: eq(schema.invoices.invoiceId, invoiceId) })
+    expect(row?.status).toBe('paid')
+  })
+
+  it('restores managed subscription schedules when the local nextChargeAt was cleared', async () => {
+    const db = await openDb(':memory:')
+    const config = loadConfig(env as any)
+    const chain = {
+      chainId: 42431,
+      operator: Account.fromSecp256k1(config.OPERATOR_PRIVATE_KEY as `0x${string}`),
+      deployment: {
+        planRegistry: '0x0000000000000000000000000000000000000001',
+        subscriptionLedger: '0x0000000000000000000000000000000000000002',
+        operator: '0x0000000000000000000000000000000000000003',
+        startBlock: 0,
+      },
+      client: {
+        accessKey: {
+          getRemainingLimit: vi.fn(async () => ({ remaining: 100n, periodEnd: 180n })),
+        },
+      },
+    } as unknown as Chain
+    const engine = new (await import('../src/scheduler/engine.js')).ChargeEngine(
+      db,
+      chain,
+      new EnvSecretKeyStore(config.KEYSTORE_SECRET),
+      new Webhooks(db, config.WEBHOOK_SECRET, 'https://example.test/hook'),
+      config,
+    )
+    await db.insert(schema.subscriptions).values({
+      subId: '88',
+      planId: '1',
+      subscriber: '0x1111111111111111111111111111111111111111',
+      merchant: '0x00000000000000000000000000000000000000Aa',
+      accessKey: '0x2222222222222222222222222222222222222222',
+      token: '0x20C0000000000000000000000000000000000001',
+      amount: '100',
+      period: 60,
+      status: 'active',
+      invoicesPaid: 0,
+      nextChargeAt: null,
+      managed: true,
+      haltReason: null,
+      createdBlock: 0,
+      createdAt: 0,
+    })
+
+    await expect(engine.reconcileManagedSubscriptions()).resolves.toBe(1)
+    const row = await db.query.subscriptions.findFirst({ where: eq(schema.subscriptions.subId, '88') })
+    expect(row?.nextChargeAt).toBe(180)
   })
 })
 

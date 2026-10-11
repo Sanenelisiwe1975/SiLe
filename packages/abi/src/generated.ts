@@ -795,9 +795,9 @@ export const subscriptionLedgerAbi = [
 
 export const deployments = {
   "42431": {
-    "planRegistry": "0x55db89fE84e2Bd0ed895702a4382BF42EE6882C5",
-    "subscriptionLedger": "0x80106042b1c49C4e993921D16b9d11cB3056e4D5",
+    "planRegistry": "0x4b7A9C83F0e99A60D40e52951ADBA838ED38B8BF",
+    "subscriptionLedger": "0xE1C30fAc2840CBD397E0e14be9aCF637EEe23A15",
     "operator": "0x35A0dfe544FCBD36D59257d735588A0BBC1605d8",
-    "startBlock": 37921745
+    "startBlock": 39129097
   }
 } as const

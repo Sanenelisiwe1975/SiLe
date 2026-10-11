@@ -62,8 +62,8 @@ and [`CLAUDE.md`](CLAUDE.md).
 | Charge #2 after the period | [0xab9b…4d75](https://explore.testnet.tempo.xyz/tx/0xab9b4fab6a4e94dceb7dd605b7486255d8df082b3b17d619d6e5aaf267c94d75) |
 | Subscriber revokes key → next charge rejected (`KeyAlreadyRevoked`) → canceled | [0x09bb…7a76](https://explore.testnet.tempo.xyz/tx/0x09bbbab5889427c7ab94add96f96e27a1f7c0128ef25cfa61a3667eaf8b07a76) |
 
-Contracts: `PlanRegistry` [`0x55db…82C5`](https://explore.testnet.tempo.xyz/address/0x55db89fE84e2Bd0ed895702a4382BF42EE6882C5),
-`SubscriptionLedger` [`0x8010…e4D5`](https://explore.testnet.tempo.xyz/address/0x80106042b1c49C4e993921D16b9d11cB3056e4D5)
+Contracts: `PlanRegistry` [`0x4b7A…8BF`](https://explore.testnet.tempo.xyz/address/0x4b7A9C83F0e99A60D40e52951ADBA838ED38B8BF),
+`SubscriptionLedger` [`0xE1C3…3A15`](https://explore.testnet.tempo.xyz/address/0xE1C30fAc2840CBD397E0e14be9aCF637EEe23A15)
 ([`contracts/deployments/42431.json`](contracts/deployments/42431.json)).
 
 ## Repository

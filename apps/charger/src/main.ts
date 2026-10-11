@@ -17,9 +17,17 @@ const webhooks = new Webhooks(db, config.WEBHOOK_SECRET, config.WEBHOOK_URL)
 const indexer = new Indexer(db, chain, webhooks)
 const engine = new ChargeEngine(db, chain, keys, webhooks, config)
 
-/** One loop: index → charge → flush webhooks. Sequential so the operator never races its own txs. */
+/** One loop: index → reconcile stale state → charge → flush webhooks. Sequential so the operator never races its own txs. */
 let stopping = false
 async function loop() {
+  try {
+    const recovered = await engine.reconcileStaleInvoices()
+    const repaired = await engine.reconcileManagedSubscriptions()
+    if (recovered > 0 || repaired > 0) log.info('startup reconciliation', { recovered, repaired })
+  } catch (e) {
+    log.error('startup reconciliation failed', { error: String(e).slice(0, 300) })
+  }
+
   while (!stopping) {
     try {
       await indexer.poll()

@@ -7,8 +7,8 @@ import { Account, WebAuthnP256 } from 'viem/tempo'
 
 /**
  * Browser identity. The subscriber's ROOT key is either a passkey (WebAuthn P256, recommended)
- * or a demo secp256k1 key kept in this browser. SiLe never sees either; it only ever holds the
- * scoped access key the subscriber authorises.
+ * or an explicit demo-only secp256k1 key, which is disabled unless NEXT_PUBLIC_ENABLE_DEMO_MODE=true.
+ * SiLe never sees either; it only ever holds the scoped access key the subscriber authorises.
  */
 type Root = ReturnType<typeof Account.fromWebAuthnP256> | ReturnType<typeof Account.fromSecp256k1>
 export type Session = { kind: 'passkey' | 'demo'; account: Root } | null
@@ -17,6 +17,8 @@ type Stored = { kind: 'passkey'; id: string; publicKey: Hex } | { kind: 'demo'; 
 
 const SESSION_KEY = 'sile.session'
 const PASSKEYS_KEY = 'sile.passkeys' // credential id → public key (a passkey stores only its id on device)
+const DEMO_MODE_ENABLED = process.env.NEXT_PUBLIC_ENABLE_DEMO_MODE === 'true'
+const DEMO_DISABLED_MESSAGE = 'Demo mode is disabled in this build. Use a passkey account to continue.'
 
 const storage = {
   get<T>(k: string): T | null {
@@ -57,6 +59,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
+    if (!DEMO_MODE_ENABLED) {
+      storage.set(SESSION_KEY, null)
+      storage.set('sile.demo', null)
+      setSession(null)
+      setReady(true)
+      return
+    }
     const s = storage.get<Stored>(SESSION_KEY)
     if (s) setSession(restore(s))
     setReady(true)
@@ -87,6 +96,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [remember])
 
   const useDemoKey = useCallback(() => {
+    if (!DEMO_MODE_ENABLED) throw new Error(DEMO_DISABLED_MESSAGE)
     const prev = storage.get<Stored>('sile.demo')
     const s: Stored = prev?.kind === 'demo' ? prev : { kind: 'demo', privateKey: generatePrivateKey() }
     storage.set('sile.demo', s)
@@ -95,6 +105,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(() => {
     storage.set(SESSION_KEY, null)
+    storage.set('sile.demo', null)
     setSession(null)
   }, [])
 

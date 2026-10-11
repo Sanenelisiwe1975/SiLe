@@ -45,9 +45,11 @@ export function AccountPanel({ title = 'Your account' }: { title?: string }) {
           <Button variant="ghost" onClick={run('signin', signInPasskey)} disabled={!!busy}>
             Sign in with passkey
           </Button>
-          <Button variant="ghost" onClick={run('demo', useDemoKey)} disabled={!!busy}>
-            Use demo key
-          </Button>
+          {process.env.NEXT_PUBLIC_ENABLE_DEMO_MODE === 'true' && (
+            <Button variant="ghost" onClick={run('demo', useDemoKey)} disabled={!!busy}>
+              Use demo key
+            </Button>
+          )}
         </div>
         {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
       </Card>
